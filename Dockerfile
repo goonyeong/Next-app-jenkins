@@ -1,23 +1,28 @@
-# 1. Node.js v20 알파인 이미지를 기반으로 시작
-FROM node:20-alpine
+# Install dependencies only when needed
+FROM node:20-alpine AS deps
+WORKDIR /app
+COPY package.json yarn.lock ./
+RUN yarn install --frozen-lockfile
 
-# 2. 작업 디렉토리 설정
+# Rebuild the source code only when needed
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY . .
+COPY --from=deps /app/node_modules ./node_modules
+RUN yarn build
+
+# Production image, copy all the files and run Next.js
+FROM node:20-alpine AS runner
 WORKDIR /app
 
-# 3. package.json과 package-lock.json을 먼저 복사하여 의존성 설치
-COPY package*.json ./
+ENV NODE_ENV production
 
-# 4. 의존성 설치
-RUN npm install
-
-# 5. Next.js 애플리케이션의 소스 코드 복사
-COPY . .
-
-# 6. Next.js 애플리케이션 빌드
-RUN npm run build
-
-# 7. 애플리케이션을 실행할 포트 노출
+# If you are using a custom server like Express or Fastify, expose the correct port
 EXPOSE 3000
 
-# 8. 애플리케이션 실행
-CMD ["npm", "start"]
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./package.json
+
+CMD ["yarn", "start"]

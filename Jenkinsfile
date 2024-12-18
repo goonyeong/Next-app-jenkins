@@ -2,11 +2,14 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_IMAGE = 'your-dockerhub-username/next-app:latest'
+        IMAGE_NAME = "nextjs-app"
+        CONTAINER_NAME = "nextjs-container"
+        DOCKER_PORT = "3000"
+        HOST_PORT = "3000"
     }
 
     stages {
-        stage('Clone Repository') {
+        stage('Checkout') {
             steps {
                 checkout scm
             }
@@ -14,25 +17,22 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                script {
-                    sh 'docker build -t $DOCKER_IMAGE .'
-                }
+                sh 'docker build -t $IMAGE_NAME .'
             }
         }
 
-        stage('Push Docker Image') {
+        stage('Run Docker Container') {
             steps {
                 script {
-                    sh 'docker login -u your-dockerhub-username -p your-dockerhub-password'
-                    sh 'docker push $DOCKER_IMAGE'
-                }
-            }
-        }
-
-        stage('Deploy') {
-            steps {
-                script {
-                    sh 'docker run -d -p 3000:3000 --name next-app $DOCKER_IMAGE'
+                    // 기존 컨테이너 중지 및 제거
+                    sh '''
+                    docker stop $CONTAINER_NAME || true
+                    docker rm $CONTAINER_NAME || true
+                    '''
+                    // 새 컨테이너 실행
+                    sh '''
+                    docker run -d --name $CONTAINER_NAME -p $HOST_PORT:$DOCKER_PORT $IMAGE_NAME
+                    '''
                 }
             }
         }
@@ -40,7 +40,7 @@ pipeline {
 
     post {
         always {
-            echo 'Pipeline Completed!'
+            echo "Pipeline completed."
         }
     }
 }
